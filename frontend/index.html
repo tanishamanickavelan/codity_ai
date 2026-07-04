@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Distributed Job Scheduler — Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<!-- ============== LOGIN SCREEN ============== -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="brand">
+      <div class="brand-mark">DJ</div>
+      <div class="brand-text">
+        <div class="name">Job Scheduler</div>
+        <div class="tag">Console</div>
+      </div>
+    </div>
+
+    <div class="login-tabs">
+      <button class="active" data-tab="login">Sign in</button>
+      <button data-tab="register">Create account</button>
+    </div>
+
+    <form id="login-form">
+      <div class="field"><label>Email</label><input type="email" id="login-email" required placeholder="you@company.com" /></div>
+      <div class="field"><label>Password</label><input type="password" id="login-password" required placeholder="••••••••" /></div>
+      <button type="submit" class="btn primary" style="width:100%; justify-content:center;">Sign in</button>
+      <div class="error-msg" id="login-error"></div>
+    </form>
+
+    <form id="register-form" style="display:none;">
+      <div class="field"><label>Full name</label><input type="text" id="register-name" placeholder="Ada Lovelace" /></div>
+      <div class="field"><label>Email</label><input type="email" id="register-email" required placeholder="you@company.com" /></div>
+      <div class="field"><label>Password</label><input type="password" id="register-password" required minlength="8" placeholder="At least 8 characters" /></div>
+      <div class="field">
+        <label>Role</label>
+        <select id="register-role">
+          <option value="admin">Admin — full control (pause queues, replay DLQ)</option>
+          <option value="operator" selected>Operator — create/manage jobs and queues</option>
+          <option value="viewer">Viewer — read-only</option>
+        </select>
+      </div>
+      <button type="submit" class="btn primary" style="width:100%; justify-content:center;">Create account</button>
+      <div class="error-msg" id="register-error"></div>
+    </form>
+  </div>
+</div>
+
+<!-- ============== MAIN APP ============== -->
+<div id="app" style="display:none;">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">DJ</div>
+      <div class="brand-text">
+        <div class="name">Job Scheduler</div>
+        <div class="tag">Console</div>
+      </div>
+    </div>
+
+    <div class="nav-item active" data-page="overview"><span class="dot"></span> Overview</div>
+    <div class="nav-item" data-page="queues"><span class="dot"></span> Queues</div>
+    <div class="nav-item" data-page="jobs"><span class="dot"></span> Job Explorer</div>
+    <div class="nav-item" data-page="workers"><span class="dot"></span> Workers</div>
+    <div class="nav-item" data-page="dlq"><span class="dot"></span> Dead Letter Queue</div>
+
+    <div class="nav-spacer"></div>
+
+    <div class="session-box">
+      <span class="email" id="session-email">—</span>
+      <button id="logout-btn">Sign out</button>
+    </div>
+  </aside>
+
+  <main>
+    <!-- ---------------- Overview ---------------- -->
+    <section class="page active" id="page-overview">
+      <div class="page-header">
+        <div>
+          <h1>System overview</h1>
+          <div class="sub">live health across queues, workers, and throughput</div>
+        </div>
+      </div>
+
+      <div class="stat-grid" id="overview-stats"></div>
+
+      <div class="panel">
+        <div class="panel-title">Job pipeline</div>
+        <div class="pipeline" id="pipeline"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Throughput — last 8 hours</div>
+        <div class="chart" id="throughput-chart"></div>
+      </div>
+    </section>
+
+    <!-- ---------------- Queues ---------------- -->
+    <section class="page" id="page-queues">
+      <div class="page-header">
+        <div>
+          <h1>Queues</h1>
+          <div class="sub">priority, concurrency, and live counts per queue</div>
+        </div>
+        <button class="btn primary" id="new-queue-btn">+ New queue</button>
+      </div>
+
+      <div class="panel" style="padding:0;">
+        <table>
+          <thead><tr><th>Name</th><th>Status</th><th>Priority</th><th>Concurrency</th><th>Queued</th><th>Running</th><th>Completed</th><th>Dead</th><th></th></tr></thead>
+          <tbody id="queues-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ---------------- Jobs ---------------- -->
+    <section class="page" id="page-jobs">
+      <div class="page-header">
+        <div>
+          <h1>Job explorer</h1>
+          <div class="sub">inspect, retry, and cancel individual jobs</div>
+        </div>
+        <button class="btn primary" id="new-job-btn">+ New job</button>
+      </div>
+
+      <div class="toolbar">
+        <select id="job-status-filter" style="width:160px;">
+          <option value="">All statuses</option>
+          <option value="queued">Queued</option>
+          <option value="scheduled">Scheduled</option>
+          <option value="blocked">Blocked (dependency)</option>
+          <option value="claimed">Claimed</option>
+          <option value="running">Running</option>
+          <option value="completed">Completed</option>
+          <option value="failed">Failed</option>
+          <option value="dead">Dead</option>
+        </select>
+        <div class="grow"></div>
+        <button class="btn small" id="jobs-refresh">Refresh</button>
+        <button class="btn small" id="jobs-prev">← Prev</button>
+        <button class="btn small" id="jobs-next">Next →</button>
+      </div>
+
+      <div class="panel" style="padding:0;">
+        <table>
+          <thead><tr><th>Job ID</th><th>Task</th><th>Status</th><th>Type</th><th>Attempts</th><th>Created</th><th>Priority</th></tr></thead>
+          <tbody id="jobs-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ---------------- Workers ---------------- -->
+    <section class="page" id="page-workers">
+      <div class="page-header">
+        <div>
+          <h1>Workers</h1>
+          <div class="sub">heartbeats and live capacity across the fleet</div>
+        </div>
+      </div>
+      <div class="panel" style="padding:0;">
+        <table>
+          <thead><tr><th>Name</th><th>Status</th><th>Concurrency</th><th>Shard</th><th>Queues</th><th>Started</th><th>Last heartbeat</th></tr></thead>
+          <tbody id="workers-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ---------------- DLQ ---------------- -->
+    <section class="page" id="page-dlq">
+      <div class="page-header">
+        <div>
+          <h1>Dead letter queue</h1>
+          <div class="sub">jobs that exhausted their retry budget</div>
+        </div>
+      </div>
+      <div class="panel" style="padding:0;">
+        <table>
+          <thead><tr><th>Job ID</th><th>Reason</th><th>Moved at</th><th>Status</th><th></th></tr></thead>
+          <tbody id="dlq-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ============== Modal: New Queue ============== -->
+<div class="overlay" id="modal-new-queue">
+  <div class="modal">
+    <h2>New queue</h2>
+    <form id="new-queue-form">
+      <div class="field"><label>Name</label><input type="text" id="nq-name" required placeholder="emails-transactional" /></div>
+      <div class="field-row">
+        <div class="field"><label>Priority</label><input type="number" id="nq-priority" value="0" /></div>
+        <div class="field"><label>Concurrency limit</label><input type="number" id="nq-concurrency" value="5" min="1" /></div>
+      </div>
+      <div class="field"><label>Shard count</label><input type="number" id="nq-shards" value="1" min="1" /></div>
+      <div class="modal-actions">
+        <button type="button" class="btn" data-close-modal="modal-new-queue">Cancel</button>
+        <button type="submit" class="btn primary">Create queue</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============== Modal: New Job ============== -->
+<div class="overlay" id="modal-new-job">
+  <div class="modal">
+    <h2>New job</h2>
+    <form id="new-job-form">
+      <div class="field"><label>Queue</label><select id="nj-queue" class="queue-select" required></select></div>
+      <div class="field-row">
+        <div class="field"><label>Task name</label><input type="text" id="nj-task" required placeholder="send_email" list="task-names" /></div>
+        <div class="field"><label>Priority</label><input type="number" id="nj-priority" value="0" /></div>
+      </div>
+      <datalist id="task-names">
+        <option value="send_email"></option>
+        <option value="resize_image"></option>
+        <option value="generate_report"></option>
+        <option value="sum_numbers"></option>
+        <option value="flaky_task"></option>
+      </datalist>
+      <div class="field"><label>Type</label>
+        <select id="nj-type">
+          <option value="immediate">Immediate</option>
+          <option value="delayed">Delayed</option>
+          <option value="scheduled">Scheduled (run at)</option>
+          <option value="recurring">Recurring (cron)</option>
+        </select>
+      </div>
+      <div class="field" id="nj-runat-field" style="display:none;"><label>Run at</label><input type="datetime-local" id="nj-runat" /></div>
+      <div class="field" id="nj-cron-field" style="display:none;"><label>Cron expression</label><input type="text" id="nj-cron" placeholder="*/5 * * * *" /></div>
+      <div class="field"><label>Depends on (job IDs, comma-separated)</label><input type="text" id="nj-depends-on" placeholder="optional — job stays blocked until these complete" /></div>
+      <div class="field"><label>Payload (JSON)</label><textarea id="nj-payload" placeholder='{"to": "user@example.com", "subject": "Hi"}'></textarea></div>
+      <div class="modal-actions">
+        <button type="button" class="btn" data-close-modal="modal-new-job">Cancel</button>
+        <button type="submit" class="btn primary">Submit job</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============== Job detail drawer ============== -->
+<div class="drawer-overlay" id="drawer-overlay">
+  <div class="drawer">
+    <button class="close-btn" id="drawer-close">✕</button>
+    <div class="section-label" style="margin-top:0;">Job</div>
+    <h2 id="drawer-title"></h2>
+    <div id="drawer-body"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>window.API_BASE = "https://YOUR-API-NAME.onrender.com";</script>
+<script src="js/app.js"></script>
+
+<script src="js/app.js"></script>
+</body>
+</html>
