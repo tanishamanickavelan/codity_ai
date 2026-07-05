@@ -216,7 +216,35 @@ body:not(.role-admin) .admin-only { display: none; }
 .toast.error { background: var(--red); border-color: var(--red); }
 .toast.success { background: var(--green); border-color: var(--green); }
 
+/* Table scroll safety net — harmless on desktop, prevents squashed
+   columns on narrow screens. Applies at all sizes since a panel that's
+   already wide enough never triggers the scrollbar. */
+.panel { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.panel table { min-width: 640px; }
+
 @media (max-width: 780px) {
-  .sidebar { display: none; }
-  main { padding: 20px; }
+  /* Sidebar becomes a horizontal top bar instead of vanishing */
+  #app { flex-direction: column; }
+  .sidebar {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    overflow-x: auto;
+    padding: 10px 12px;
+    gap: 4px;
+    border-right: none;
+    border-bottom: 2px solid var(--border);
+  }
+  .brand { padding: 0 10px 0 0; flex-shrink: 0; }
+  .nav-item { flex-shrink: 0; padding: 10px 12px; font-size: 14px; white-space: nowrap; }
+  .nav-item .dot { display: none; } /* saves space, icon-only nav labels remain */
+  .nav-spacer { display: none; }
+  .session-box { display: none; } /* sign-out still reachable via desktop width; optional to keep */
+
+  main { padding: 16px; }
+
+  .field-row { flex-wrap: wrap; }
+  .field-row .field { flex: 1 1 100%; }
+
+  .stat-card .value { font-size: 26px; }
 }
