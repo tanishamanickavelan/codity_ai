@@ -6,7 +6,7 @@ atomic job claiming so that two workers polling the same queue at the
 same instant can never both start executing the same job.
 """
 import hashlib
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from sqlalchemy import update
@@ -66,6 +66,16 @@ def create_job(
     """
     now = datetime.utcnow()
     effective_run_at = run_at or now
+
+    # The dashboard (and any well-behaved API client) sends run_at as an ISO
+    # timestamp with a timezone marker, e.g. "...T15:42:00.000Z". Pydantic
+    # parses that into a timezone-*aware* datetime, while `now` above is
+    # timezone-*naive* (datetime.utcnow()). Python refuses to compare aware
+    # and naive datetimes directly and raises TypeError, which previously
+    # surfaced as an unexplained 500 error on every delayed/scheduled job
+    # submission. Normalizing to naive UTC here fixes it for good.
+    if effective_run_at.tzinfo is not None:
+        effective_run_at = effective_run_at.astimezone(timezone.utc).replace(tzinfo=None)
 
     if idempotency_key:
         existing = db.query(models.Job).filter(
