@@ -479,6 +479,13 @@ document.getElementById("drawer-close").addEventListener("click", closeDrawer);
 
 // ---------------- Workers ----------------
 
+function workerStatusLabel(status) {
+  // "idle" means the worker's heartbeat is current but it isn't running a
+  // job right this second - that's still online. Renamed for display only;
+  // the underlying status value and badge coloring are unchanged.
+  return status === "idle" ? "online" : status;
+}
+
 async function loadWorkersPage() {
   try {
     const workers = await api("/api/workers");
@@ -490,7 +497,7 @@ async function loadWorkersPage() {
     tbody.innerHTML = workers.map((w) => `
       <tr>
         <td class="mono">${w.name}</td>
-        <td><span class="badge ${w.status}">${w.status}</span></td>
+        <td><span class="badge ${w.status}">${workerStatusLabel(w.status)}</span></td>
         <td>${w.concurrency}</td>
         <td>${w.shard_id !== null && w.shard_id !== undefined ? w.shard_id : "all"}</td>
         <td>${w.queues.length ? w.queues.length + " queue(s)" : "all queues"}</td>
